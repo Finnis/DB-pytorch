@@ -1,0 +1,55 @@
+base: 'configs/icdar2015.yaml'
+loss:
+  type: L1BalanceCELoss
+  args:
+    eps: 0.000001
+    l1_scale: 10
+    bce_scale: 1
+optimizer:
+  type: SGD
+  args:
+    lr: 0.001
+    momentum: 0.9    
+    weight_decay: 0.00001
+    nesterov: true
+lr_scheduler:
+  type: WarmupPolyLR
+  args:
+    last_lr: 0.00001
+    warmup_epoch: 10
+    warmup_method: linear
+trainer:
+  clip_grad_norm: 20
+  seed: 2
+  epochs: 1200
+  log_iter: 10
+  outputs: 'outputs/'
+  restore: true
+  tensorboard: false
+  use_benchmark: true
+arch:
+  backbone:
+    type: deformable_resnet50
+    args:
+      pretrained: true
+  head:
+    type: SegDetector
+    args:
+      in_channels: [256, 512, 1024, 2048]
+      inner_channels: 256
+      k: 50
+      adaptive: true
+      smooth: false
+      serial: false
+post_process:
+  type: SegDetectorRepresenter
+  args:
+    thresh: 0.3
+    box_thresh: 0.7
+    max_candidates: 1000
+    unclip_ratio: 1.5 # from paper
+    min_size: 3
+metric:
+  type: QuadMetric
+  args:
+    is_output_polygon: false
