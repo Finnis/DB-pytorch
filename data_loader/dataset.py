@@ -174,6 +174,8 @@ class SynthTextDataset(BaseDataset):
             transcripts = [word for line in texts for word in line.split()]
             if numOfWords != len(transcripts):
                 continue
+            if not self._validate_polys(text_polys):
+                continue
             item['img_path'] = os.path.join(data_path, imageName)
             item['img_name'] = os.path.basename(imageName)
             item['text_polys'] = text_polys
@@ -183,6 +185,13 @@ class SynthTextDataset(BaseDataset):
         logger.info(f'Total {len(t_data_list)} images for SynthText dataset.')
 
         return t_data_list
+    
+    @staticmethod
+    def _validate_polys(text_polys):
+        for poly in text_polys:
+            if cv2.contourArea(poly) < 10:
+                return False
+        return True
 
     def _get_annotations(self, data_path):
         gt_path = os.path.join(data_path, 'gt.mat')
