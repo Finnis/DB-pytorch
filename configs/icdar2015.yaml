@@ -34,7 +34,7 @@ dataset:
       filter_keys: [img_path, img_name, shape, texts, ignore_tags, text_polys]  # 返回数据之前，从数据字典里删除的key
       ignore_tags: ['*', '###']
     loader:
-      batch_size: 16
+      batch_size: 12
       shuffle: true
       pin_memory: true
       num_workers: 4

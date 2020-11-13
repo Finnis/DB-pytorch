@@ -1,4 +1,4 @@
-base: 'configs/synthtext.yaml'
+base: 'configs/icdar2015.yaml'
 loss:
   type: L1BalanceCELoss
   args:
@@ -15,17 +15,17 @@ optimizer:
 lr_scheduler:
   type: WarmupPolyLR
   args:
-    last_lr: 0.0001
-    warmup_epoch: 0
+    last_lr: 0.00005
+    warmup_epoch: 10
     warmup_method: linear
 trainer:
   clip_grad_norm: 20
   seed: 2
-  epochs: 2
+  epochs: 1000
   log_iter: 10
   outputs: 'outputs/'
   restore: false
-  tensorboard: false
+  tensorboard: true
   use_benchmark: true
 arch:
   backbone:
@@ -39,7 +39,7 @@ arch:
       inner_channels: 256
       k: 50
       adaptive: true
-      smooth: false
+      smooth: true
       serial: false
 post_process:
   type: SegDetectorRepresenter

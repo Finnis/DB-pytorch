@@ -21,7 +21,7 @@ class BalanceCrossEntropyLoss(nn.Module):
         >>> output.backward()
     '''
 
-    def __init__(self, negative_ratio=3.0, eps=1e-6):
+    def __init__(self, negative_ratio=3.0, eps=1e-8):
         super(BalanceCrossEntropyLoss, self).__init__()
         self.negative_ratio = negative_ratio
         self.eps = eps
@@ -69,7 +69,7 @@ class BalanceCrossEntropyLossV2(nn.Module):
         >>> output.backward()
     '''
 
-    def __init__(self, negative_ratio=3.0, eps=1e-6):
+    def __init__(self, negative_ratio=3.0, eps=1e-8):
         super().__init__()
         self.negative_ratio = negative_ratio
         self.eps = eps
@@ -89,12 +89,13 @@ class BalanceCrossEntropyLossV2(nn.Module):
         positive_loss = loss * positive
         negative_loss = loss * negative
         
-        balance_loss = 0
-        for i in range(positive_count.size(0)):
+        balance_loss = 0.
+        bsize = positive_count.size(0)
+        for i in range(bsize):
             neg_loss, _ = torch.topk(negative_loss[i].view(-1), negative_count[i].int().item())
             balance_loss += (positive_loss[i].sum() + neg_loss.sum()) /\
                 (positive_count[i] + negative_count[i] + self.eps)
-        balance_loss = torch.mean(balance_loss)
+        balance_loss /= bsize
 
         if return_origin:
             return balance_loss, loss

@@ -67,13 +67,8 @@ class DetectionIoUEvaluator(object):
 
         matchedSum = 0
 
-        Rectangle = namedtuple('Rectangle', 'xmin ymin xmax ymax')
-
         numGlobalCareGt = 0
         numGlobalCareDet = 0
-
-        arrGlobalConfidences = []
-        arrGlobalMatches = []
 
         recall = 0
         precision = 0
@@ -96,9 +91,6 @@ class DetectionIoUEvaluator(object):
 
         pairs = []
         detMatchedNums = []
-
-        arrSampleConfidences = []
-        arrSampleMatch = []
 
         evaluationLog = ""
 
