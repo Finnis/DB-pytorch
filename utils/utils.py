@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def order_points_clockwise(pts):
-    rect = np.zeros((4, 2), dtype="float32")
+    rect = np.zeros((4, 2), dtype=np.float32)
     s = pts.sum(axis=1)
     rect[0] = pts[np.argmin(s)]
     rect[2] = pts[np.argmax(s)]

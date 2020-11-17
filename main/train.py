@@ -11,8 +11,10 @@ from torch.utils.tensorboard import SummaryWriter
 
 from nets import DBModel
 from loss import seg_detector_loss as Losses
-from utils import prepare_dir, clean_ckpts, logger, WarmupPolyLR, TextScores,\
-    SegDetectorRepresenter, QuadMetric, AverageMeter
+from utils import prepare_dir, clean_ckpts, logger, TextScores,\
+    QuadMetric, AverageMeter
+from utils.post_process import SegDetectorRepresenter
+from utils import lr_schedulers
 from data_loader import get_dataloader
 
 
@@ -45,27 +47,29 @@ class Trainer:
             (self.model.parameters(), **self.cfg['optimizer']['args'])
 
         # Create learning_rate scheduler
-        self.lr_scheduler = WarmupPolyLR(
-            self.optimizer,
-            target_lr=self.cfg['lr_scheduler']['args']['last_lr'],
-            max_iters=self.cfg['trainer']['epochs'],
-            warmup_iters=self.cfg['lr_scheduler']['args']['warmup_epoch'],
-            last_epoch=-1
-        )
+        if self.cfg['lr_scheduler']['type'] == 'WarmupPolyLR':
+            self.cfg['lr_scheduler']['args']['max_iters'] = self.cfg['trainer']['epochs']
+        self.lr_scheduler = getattr(lr_schedulers, self.cfg['lr_scheduler']['type'])\
+            (self.optimizer, **self.cfg['lr_scheduler']['args'])
 
         # Load model from previous checkpoint
         self.step, self.epoch = 0, 0
         self.ckpt_path = self.cfg['trainer']['outputs'] + self.cfg['arch']['backbone']['type'] + '/checkpoints'
-        if self.cfg['trainer']['restore']:
+        if self.cfg['trainer']['restore'] and len(os.listdir(self.ckpt_path)) > 0:
             ckpt = os.path.join(self.ckpt_path, sorted(os.listdir(self.ckpt_path))[-1])
             ckpt = torch.load(ckpt)
-            self.model.module.load_state_dict(ckpt['model'], strict=True)
-            self.optimizer.load_state_dict(ckpt['optimizer'])
-            self.step = ckpt['step']
-            self.epoch = ckpt['epoch'] + 1
-            self.lr_scheduler.load_state_dict(ckpt['lr_scheduler'])
-            if self.local_rank == 0:
-                logger.info(f'Contatinue training from step {self.step} and epoch {self.epoch}.')
+            if self.cfg['trainer']['restore_all']:
+                self.model.module.load_state_dict(ckpt['model'], strict=True)
+                self.optimizer.load_state_dict(ckpt['optimizer'])
+                self.step = ckpt['step']
+                self.epoch = ckpt['epoch'] + 1
+                self.lr_scheduler.load_state_dict(ckpt['lr_scheduler'])
+                if self.local_rank == 0:
+                    logger.info(f'Contatinue training from step {self.step} and epoch {self.epoch}.')
+            else:
+                self.model.module.load_state_dict(ckpt['model'], strict=False)
+                if self.local_rank == 0:
+                    logger.info('Using pretrained weights for training.')
         elif self.local_rank == 0:
             prepare_dir(self.ckpt_path)
             logger.info(f"{self.ckpt_path} was cleaned.")

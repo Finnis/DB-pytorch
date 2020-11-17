@@ -26,13 +26,13 @@ eval:
       batch_size: 1
       shuffle: false
       pin_memory: True
-      num_workers: 4
+      num_workers: 0
       collate_fn: ICDARCollectFN
 arch:
   backbone:
     type: deformable_resnet18
     args:
-      pretrained: true
+      pretrained: false
   head:
     type: SegDetector
     args:

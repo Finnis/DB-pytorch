@@ -37,7 +37,7 @@ dataset:
       batch_size: 12
       shuffle: true
       pin_memory: true
-      num_workers: 4
+      num_workers: 6
       collate_fn: ''
   val:
     type: ICDAR2015Dataset
@@ -63,5 +63,5 @@ dataset:
       batch_size: 1
       shuffle: false
       pin_memory: true
-      num_workers: 4
+      num_workers: 0
       collate_fn: ICDARCollectFN

@@ -6,7 +6,8 @@ import argparse
 
 from nets import DBModel
 from data_loader import get_dataloader
-from utils import SegDetectorRepresenter, logger, QuadMetric
+from utils import logger, QuadMetric
+from utils.post_process import SegDetectorRepresenter
 
 
 class Eval:

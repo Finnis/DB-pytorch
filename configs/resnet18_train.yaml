@@ -16,7 +16,7 @@ lr_scheduler:
   type: WarmupPolyLR
   args:
     last_lr: 0.00001
-    warmup_epoch: 10
+    warmup_iters: 10
     warmup_method: linear
 arch:
   backbone:
@@ -50,5 +50,6 @@ trainer:
   log_iter: 20
   outputs: 'outputs/'
   restore: false
+  restore_all: false
   tensorboard: true
   use_benchmark: true

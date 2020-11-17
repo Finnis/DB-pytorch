@@ -3,6 +3,8 @@ import numpy as np
 import pyclipper
 from shapely.geometry import Polygon
 
+from .utils import order_points_clockwise
+
 
 # For post_process
 class SegDetectorRepresenter(object):
@@ -21,7 +23,7 @@ class SegDetectorRepresenter(object):
             binary: binarized with threshhold, (N, H, W)
         '''
         assert len(preds.shape) == 3
-        bitmaps = np.where(preds > self.thresh, 1, 0).astype(np.uint8)  # binarize
+        bitmaps = (preds > self.thresh).astype(np.uint8)  # binarize
         boxes_batch = []
         scores_batch = []
         for pred, bitmap, (h, w) in zip(preds, bitmaps, shapes):
@@ -58,8 +60,9 @@ class SegDetectorRepresenter(object):
                     continue
             else:
                 continue
-            #box = box.reshape(-1, 2)
-            _, sside = self.get_mini_boxes(box.reshape((-1, 1, 2)))
+
+            #_, sside = self.get_mini_box(box.reshape((-1, 1, 2)))
+            sside = min(cv2.minAreaRect(box.reshape((-1, 1, 2)))[1])
             if sside < self.min_size + 2:
                 continue
 
@@ -71,28 +74,27 @@ class SegDetectorRepresenter(object):
 
     def boxes_from_bitmap(self, pred, bitmap, dest_width, dest_height):
         '''
-        bitmap: single map with shape (H, W), whose values are binarized as {0, 1}
+        bitmap: single map with shape (H, W), whose values are binarized to {0, 1}
         '''
         height, width = bitmap.shape
-        contours, _ = cv2.findContours((bitmap * 255).astype(np.uint8), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(bitmap * 255, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         num_contours = min(len(contours), self.max_candidates)
         boxes, scores = [], []
 
         for index in range(num_contours):
             contour = contours[index].squeeze(1)
-            points, sside = self.get_mini_boxes(contour)
+            points, sside = self.get_mini_box(contour)
             if sside < self.min_size:
                 continue
-            points = np.array(points)
+
             score = self.box_score_fast(pred, contour)
             if self.box_thresh > score:
                 continue
 
             box = self.unclip(points, unclip_ratio=self.unclip_ratio).reshape(-1, 1, 2)
-            box, sside = self.get_mini_boxes(box)
+            box, sside = self.get_mini_box(box)
             if sside < self.min_size + 2:
                 continue
-            box = np.array(box)
 
             box[:, 0] = np.clip(np.round(box[:, 0] / width * dest_width), 0, dest_width)
             box[:, 1] = np.clip(np.round(box[:, 1] / height * dest_height), 0, dest_height)
@@ -102,7 +104,7 @@ class SegDetectorRepresenter(object):
 
         return np.array(boxes, dtype=np.int32), np.array(scores, dtype=np.float32)
 
-    def unclip(self, box, unclip_ratio=1.5):
+    def unclip(self, box, unclip_ratio):
         poly = Polygon(box)
         distance = poly.area * unclip_ratio / poly.length
         offset = pyclipper.PyclipperOffset()
@@ -110,26 +112,11 @@ class SegDetectorRepresenter(object):
         expanded = np.array(offset.Execute(distance))
         return expanded
 
-    def get_mini_boxes(self, contour):
+    def get_mini_box(self, contour):
         rect = cv2.minAreaRect(contour)
-        points = sorted(list(cv2.boxPoints(rect)), key=lambda x: x[0])
-        #points = np.sort(cv2.boxPoints(rect), axis=0)
-
-        index_1, index_2, index_3, index_4 = 0, 1, 2, 3
-        if points[1][1] > points[0][1]:
-            index_1 = 0
-            index_4 = 1
-        else:
-            index_1 = 1
-            index_4 = 0
-        if points[3][1] > points[2][1]:
-            index_2 = 2
-            index_3 = 3
-        else:
-            index_2 = 3
-            index_3 = 2
-
-        box = [points[index_1], points[index_2], points[index_3], points[index_4]]
+        box = cv2.boxPoints(rect)
+        box = order_points_clockwise(box)
+        
         return box, min(rect[1])
 
     def box_score_fast(self, bitmap, _box):

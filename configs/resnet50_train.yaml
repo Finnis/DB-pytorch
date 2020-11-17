@@ -8,15 +8,15 @@ loss:
 optimizer:
   type: SGD
   args:
-    lr: 0.001
+    lr: 0.005
     momentum: 0.9    
     weight_decay: 0.00001
     nesterov: true
 lr_scheduler:
   type: WarmupPolyLR
   args:
-    last_lr: 0.00005
-    warmup_epoch: 10
+    last_lr: 0.00001
+    warmup_iters: 10
     warmup_method: linear
 trainer:
   clip_grad_norm: 20
@@ -24,14 +24,15 @@ trainer:
   epochs: 1000
   log_iter: 10
   outputs: 'outputs/'
-  restore: false
+  restore: true
+  restore_all: false
   tensorboard: true
   use_benchmark: true
 arch:
   backbone:
     type: deformable_resnet50
     args:
-      pretrained: true
+      pretrained: false
   head:
     type: SegDetector
     args:

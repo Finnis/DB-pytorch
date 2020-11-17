@@ -26,7 +26,7 @@ eval:
       batch_size: 1
       shuffle: false
       pin_memory: True
-      num_workers: 4
+      num_workers: 0
       collate_fn: ICDARCollectFN
 arch:
   backbone:
@@ -36,11 +36,11 @@ arch:
   head:
     type: SegDetector
     args:
-    in_channels: [256, 512, 1024, 2048]
+      in_channels: [256, 512, 1024, 2048]
       inner_channels: 256
       k: 50
       adaptive: true
-      smooth: false
+      smooth: true
       serial: false
 post_process:
   type: SegDetectorRepresenter

@@ -21,22 +21,6 @@ Return:
 """
 
 
-class DiceLoss(nn.Module):
-    '''
-    DiceLoss on prob.
-    For SegDetector without adaptive module.
-    '''
-
-    def __init__(self, eps=1e-6):
-        super(DiceLoss, self).__init__()
-        from .dice_loss import DiceLoss as Loss
-        self.loss = Loss(eps)
-
-    def forward(self, pred, target):
-        loss = self.loss(pred['prob'], target['gt'], target['mask'])
-        return loss, dict(dice_loss=loss)
-
-
 class BalanceBCELoss(nn.Module):
     '''
     DiceLoss on prob.
@@ -159,10 +143,10 @@ class L1BalanceCELoss(nn.Module):
     '''
     def __init__(self, eps=1e-6, l1_scale=10, bce_scale=5):
         super(L1BalanceCELoss, self).__init__()
-        from .dice_loss import DiceLoss
+        from .dice_loss import DiceLossV2
         from .l1_loss import MaskL1Loss
         from .balance_cross_entropy_loss import BalanceCrossEntropyLossV2
-        self.dice_loss = DiceLoss(eps=eps)
+        self.dice_loss = DiceLossV2(eps=eps)
         self.l1_loss = MaskL1Loss()
         self.bce_loss = BalanceCrossEntropyLossV2()
 

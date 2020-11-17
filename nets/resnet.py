@@ -2,6 +2,7 @@ import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
 BatchNorm2d = nn.BatchNorm2d
+from torchvision.ops import DeformConv2d
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
 
@@ -35,11 +36,9 @@ class BasicBlock(nn.Module):
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
-        self.with_modulated_dcn = False
         if not self.with_dcn:
             self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1, bias=False)
         else:
-            from torchvision.ops import DeformConv2d
             deformable_groups = dcn.get('deformable_groups', 1)
             offset_channels = 18
             self.conv2_offset = nn.Conv2d(planes, deformable_groups * offset_channels, kernel_size=3, padding=1)
@@ -77,12 +76,10 @@ class Bottleneck(nn.Module):
         self.with_dcn = dcn is not None
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = BatchNorm2d(planes)
-        self.with_modulated_dcn = False
         if not self.with_dcn:
             self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         else:
             deformable_groups = dcn.get('deformable_groups', 1)
-            from torchvision.ops import DeformConv2d
             offset_channels = 18
             self.conv2_offset = nn.Conv2d(planes, deformable_groups * offset_channels, stride=stride, kernel_size=3, padding=1)
             self.conv2 = DeformConv2d(planes, planes, kernel_size=3, padding=1, stride=stride, bias=False, groups=deformable_groups)
@@ -94,7 +91,7 @@ class Bottleneck(nn.Module):
         self.stride = stride
 
     def forward(self, x):
-        residual = x
+        residual = x if self.downsample is None else self.downsample(x)
 
         out = self.relu(self.bn1(self.conv1(x)))
 
@@ -107,9 +104,6 @@ class Bottleneck(nn.Module):
         out = self.relu(self.bn2(out))
 
         out = self.bn3(self.conv3(out))
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
         
         out += residual
         out = self.relu(out)
@@ -118,10 +112,8 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, num_classes=1000, 
-                 dcn=None, stage_with_dcn=(False, False, False, False)):
+    def __init__(self, block, layers, num_classes=1000, dcn=None):
         self.dcn = dcn
-        self.stage_with_dcn = stage_with_dcn
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -132,23 +124,33 @@ class ResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dcn=dcn)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dcn=dcn)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dcn=dcn)
-        self.avgpool = nn.AvgPool2d(7, stride=1)
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        # self.avgpool = nn.AvgPool2d(7, stride=1)
+        # self.fc = nn.Linear(512 * block.expansion, num_classes)
     
-        self.smooth = nn.Conv2d(2048, 256, kernel_size=1, stride=1, padding=1)    
+        # self.smooth = nn.Conv2d(2048, 256, kernel_size=1, stride=1, padding=1)
 
-        for m in self.modules():
+        self.apply(self._weights_init)
+
+    @staticmethod
+    def _weights_init(model):
+        # Official init from torch repo.
+        for m in model.modules():
             if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
-            elif isinstance(m, BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-        if self.dcn is not None:
-            for m in self.modules():
-                if isinstance(m, (Bottleneck, BasicBlock)):
-                    if hasattr(m, 'conv2_offset'):
-                        constant_init(m.conv2_offset, 0)
+                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, (Bottleneck, BasicBlock)):
+                for mm in m.modules():
+                    if isinstance(mm, nn.Conv2d):
+                        nn.init.kaiming_normal_(mm.weight)
+                    elif isinstance(mm, nn.BatchNorm2d):
+                        nn.init.constant_(mm.weight, 1)
+                        nn.init.constant_(mm.bias, 0)
+                if hasattr(m, 'conv2_offset'):
+                    constant_init(m.conv2_offset, 0)
 
     def _make_layer(self, block, planes, blocks, stride=1, dcn=None):
         downsample = None
@@ -197,8 +199,7 @@ def deformable_resnet18(pretrained=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2],
-                   dcn=dict(deformable_groups=1),
-                   stage_with_dcn=[False, True, True, True], **kwargs)
+                   dcn=dict(deformable_groups=1), **kwargs)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet18']), strict=False)
     
@@ -233,8 +234,7 @@ def deformable_resnet50(pretrained=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3],
-                   dcn=dict(deformable_groups=1),
-                   stage_with_dcn=[False, True, True, True], **kwargs)
+                   dcn=dict(deformable_groups=1), **kwargs)
     if pretrained:
         model.load_state_dict(model_zoo.load_url(model_urls['resnet50']), strict=False)
     return model

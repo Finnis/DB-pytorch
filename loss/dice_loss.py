@@ -42,7 +42,7 @@ class DiceLossV2(nn.Module):
     diversity bwtween tow heatmaps.
     '''
     def __init__(self, eps=1e-8):
-        super(DiceLoss, self).__init__()
+        super().__init__()
         self.eps = eps
 
     def forward(self, pred: torch.Tensor, gt, mask, weights=None):
